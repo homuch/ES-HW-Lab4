@@ -53,20 +53,20 @@ def solve_x_axes(buff):
 
 
 def notification_loop(peripheral, characteristic):
-    #while True:
-     #   time.sleep(0.2)
-      #  print('', end='', flush=True)
-       # try:
-        #    if peripheral.waitForNotifications(1.0):
-         #       continue
-        #except Exception as e:
-         #   print(f"error:{e}")
-          #  pass
     while True:
-        time.sleep(1.0)
-        val= characteristic.read().hex()
-        x_axes = solve_x_axes( buff = binascii.unhexlify(val))
-        print(f"read {x_axes}")
+        time.sleep(0.2)
+        print('', end='', flush=True)
+        try:
+            if peripheral.waitForNotifications(1.0):
+                continue
+        except Exception as e:
+            print(f"error:{e}")
+            pass
+    #while True:
+     #   time.sleep(0.1)
+      #  val= characteristic.read().hex()
+       # x_axes = solve_x_axes( buff = binascii.unhexlify(val))
+        #print(f"\033[2mread {x_axes}\033[0m", flush=True)
 
 
 
@@ -88,9 +88,11 @@ class MyDelegate(DefaultDelegate):
         DefaultDelegate.__init__(self)
 
     def handleNotification(self, cHandle, data):
+        val= data.hex()
+        x_axes = solve_x_axes( buff = binascii.unhexlify(val))
         start='\033[96m'
         ENDC = '\033[0m'
-        print(f"{start}Received notification: {data.hex()} (handle: {cHandle}){ENDC}")
+        print(f"{start}Received notification: {x_axes} (handle: {cHandle}){ENDC}")
 
 
 
@@ -130,7 +132,9 @@ def connect_and_subscribe(device_addr):
                         # Enable notifications/indications
                         if support_indicate: # check indicate property
                             p.writeCharacteristic(cccd_handle, b"\x02\x00", withResponse=True)
-
+                        characteristic_handle = char_notif.getHandle()
+                        cccd_handle = characteristic_handle + 1  # Usually, but check documentation
+                        p.writeCharacteristic(cccd_handle, b"\x01\x00", withResponse=True)
                         notification_thread = threading.Thread(target=notification_loop, args=(p, char_notif), daemon=True) # daemon thread will close when the main thread exits
                         notification_thread.start()
 
@@ -139,9 +143,9 @@ def connect_and_subscribe(device_addr):
 
 
             # Main thread waits for the interactive thread to finish (when the user enters 'q')
-                        interactive_thread.join()
+                        #interactive_thread.join()
 
-
+                        
                     else:
                         print(f"characteristic {CHARACTERISTIC_UUID} doesn't support notify, indicate, write or write without response property")
 
@@ -183,30 +187,36 @@ def connect_get_addr():
         n += 1
         for (adtype, desc, value) in dev.getScanData():
             print(" %s = %s" % (desc, value))
+    return "f6:8c:f2:d3:ea:e7"
     print(mm)
     number = input('Enter your device number: ')
-    print('Device', number)
+    print('Device', number, addr[int(number)])
     num = int(number)
-    return addr[num]
+    # return addr[num]
 
-if __name__ == "__main__":
-
+def main():
+    import sys
     try:
         addr = connect_get_addr()
-        if True:
-            peripheral = connect_and_subscribe(addr)
-            if peripheral:
-                try:
-                    while True:
-                        time.sleep(1)
-                        # Add any other periodic tasks here if needed
+        peripheral = connect_and_subscribe(addr)
+        if peripheral:
+            try:
+                while True:
+                    time.sleep(1)
+                    # Add any other periodic tasks here if needed
 
-                except KeyboardInterrupt:
-                    print("\nExiting...")
+            except KeyboardInterrupt:
+                print("\nExiting...")
+                sys.exit(0)
 
-                finally:
-                    peripheral.disconnect()
-                    print("Disconnected.")
+            finally:
+                peripheral.disconnect()
+                print("Disconnected.")
 
     except Exception as e:
         print(f"Error: {e}")
+
+
+if __name__ == "__main__":
+    while True:
+        main()

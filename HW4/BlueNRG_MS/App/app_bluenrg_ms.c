@@ -54,7 +54,7 @@ extern AxesRaw_t x_axes;
 extern AxesRaw_t g_axes;
 extern AxesRaw_t m_axes;
 extern AxesRaw_t q_axes;
-
+extern volatile uint8_t want_update;
 extern volatile uint8_t set_connectable;
 extern volatile int     connected;
 /* at startup, suppose the X-NUCLEO-IDB04A1 is used */
@@ -71,6 +71,7 @@ extern LSM6DSL_Axes_t acc_axes;
 
 /* Private function prototypes -----------------------------------------------*/
 static void User_Process(void);
+void UPP(void);
 static void User_Init(void);
 static void Set_Random_Environmental_Values(float *data_t, float *data_p);
 static void Set_Random_Motion_Values(uint32_t cnt);
@@ -285,22 +286,25 @@ static void User_Process(void)
       /* Update emulated Environmental data */
 //      Set_Random_Environmental_Values(&data_t, &data_p);
 //      BlueMS_Environmental_Update((int32_t)(data_p *100), (int16_t)(data_t * 10));
-      tBleStatus ret = aci_gatt_read_charac_val(connection_handle, EnvironmentalCharHandle);
-      if (ret != BLE_STATUS_SUCCESS){
-    	  PRINTF("Error while reading TEMP characteristic: 0x%04X\n", ret) ;
-//	  	  return BLE_STATUS_ERROR ;
-      } else {
-    	  PRINTF("I'm happy.\r\n");
-      }
+//      tBleStatus ret = aci_gatt_read_charac_val(connection_handle, EnvironmentalCharHandle);
+//      if (ret != BLE_STATUS_SUCCESS){
+//    	  PRINTF("Error while reading TEMP characteristic: 0x%04X\n", ret) ;
+////	  	  return BLE_STATUS_ERROR ;
+//      } else {
+//    	  PRINTF("I'm happy.\r\n");
+//      }
 
       /* Update emulated Acceleration, Gyroscope and Sensor Fusion data */
 //      Set_Random_Motion_Values(counter);
       x_axes.AXIS_X  = acc_axes.x;
       x_axes.AXIS_Y  = acc_axes.y;
       x_axes.AXIS_Z  = acc_axes.z;
-      Acc_Update(&x_axes, &g_axes, &m_axes);
-      PRINTF("ACC UPDATE SUCCESS!! it's %d, %d, %d", x_axes.AXIS_X, x_axes.AXIS_Y, x_axes.AXIS_Z);
-      Quat_Update(&q_axes);
+      if(want_update){
+		  Acc_Update(&x_axes, &g_axes, &m_axes);
+		  PRINTF("ACC UPDATE SUCCESS!! it's %d, %d, %d\r\n", x_axes.AXIS_X, x_axes.AXIS_Y, x_axes.AXIS_Z);
+		  Quat_Update(&q_axes);
+		  want_update = 0;
+      }
 
 //      counter ++;
 //      if (counter == 40) {
@@ -308,7 +312,75 @@ static void User_Process(void)
 //        Reset_Motion_Values();
 //      }
 #if !USE_BUTTON
-      HAL_Delay(1000); /* wait 1 sec before sending new data */
+      HAL_Delay(10); /* wait 1 sec before sending new data */
+#endif
+    }
+#if USE_BUTTON
+    /* Reset the User Button flag */
+    user_button_pressed = 0;
+  }
+#endif
+}
+
+void UPP(void)
+{
+  float data_t;
+  float data_p;
+  static uint32_t counter = 0;
+
+//  if (set_connectable)
+//  {
+//    Set_DeviceConnectable();
+//    set_connectable = FALSE;
+//  }
+
+#if USE_BUTTON
+  /* Check if the user has pushed the button */
+  if (user_button_pressed)
+  {
+    /* Debouncing */
+    HAL_Delay(50);
+
+    /* Wait until the User Button is released */
+    while (BSP_PB_GetState(BUTTON_KEY) == !user_button_init_state);
+
+    /* Debouncing */
+    HAL_Delay(50);
+#endif
+//    BSP_LED_Toggle(LED2);
+
+    if (connected)
+    {
+      /* Set a random seed */
+      srand(HAL_GetTick());
+
+      /* Update emulated Environmental data */
+//      Set_Random_Environmental_Values(&data_t, &data_p);
+//      BlueMS_Environmental_Update((int32_t)(data_p *100), (int16_t)(data_t * 10));
+//      tBleStatus ret = aci_gatt_read_charac_val(connection_handle, EnvironmentalCharHandle);
+//      if (ret != BLE_STATUS_SUCCESS){
+//    	  PRINTF("Error while reading TEMP characteristic: 0x%04X\n", ret) ;
+////	  	  return BLE_STATUS_ERROR ;
+//      } else {
+//    	  PRINTF("I'm happy.\r\n");
+//      }
+
+      /* Update emulated Acceleration, Gyroscope and Sensor Fusion data */
+//      Set_Random_Motion_Values(counter);
+//      x_axes.AXIS_X  = acc_axes.x;
+//      x_axes.AXIS_Y  = acc_axes.y;
+//      x_axes.AXIS_Z  = acc_axes.z;
+//      Acc_Update(&x_axes, &g_axes, &m_axes);
+//      PRINTF("ACC UPDATE SUCCESS!! it's %d, %d, %d", x_axes.AXIS_X, x_axes.AXIS_Y, x_axes.AXIS_Z);
+//      Quat_Update(&q_axes);
+
+//      counter ++;
+//      if (counter == 40) {
+//        counter = 0;
+//        Reset_Motion_Values();
+//      }
+#if !USE_BUTTON
+      HAL_Delay(10); /* wait 1 sec before sending new data */
 #endif
     }
 #if USE_BUTTON

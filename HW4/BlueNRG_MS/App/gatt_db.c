@@ -101,9 +101,9 @@ tBleStatus Add_HWServW2ST_Service(void)
   BLUENRG_memcpy(&char_uuid.Char_UUID_128, uuid, 16);
   ret =  aci_gatt_add_char(HWServW2STHandle, UUID_TYPE_128, char_uuid.Char_UUID_128,
                            2+3*3*2,
-                           CHAR_PROP_NOTIFY|CHAR_PROP_READ,
+						   CHAR_PROP_NOTIFY | CHAR_PROP_READ,
                            ATTR_PERMISSION_NONE,
-                           GATT_NOTIFY_READ_REQ_AND_WAIT_FOR_APPL_RESP,
+						   0,
                            16, 0, &AccGyroMagCharHandle);
   if (ret != BLE_STATUS_SUCCESS)
     return BLE_STATUS_ERROR;
@@ -177,7 +177,7 @@ tBleStatus Acc_Update(AxesRaw_t *x_axes, AxesRaw_t *g_axes, AxesRaw_t *m_axes)
   ret = aci_gatt_update_char_value(HWServW2STHandle, AccGyroMagCharHandle,
 				   0, 2+2*3*3, buff);
   if (ret != BLE_STATUS_SUCCESS){
-    PRINTF("Error while updating Acceleration characteristic: 0x%02X\n",ret) ;
+    PRINTF("Error while updating Acceleration characteristic: 0x%02X\r\n",ret) ;
     return BLE_STATUS_ERROR ;
   }
 

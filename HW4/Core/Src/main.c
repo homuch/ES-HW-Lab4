@@ -26,9 +26,21 @@
 #include "lsm6dsl.h"
 #include "b_l475e_iot01a2_bus.h"
 #include "bluenrg_conf.h"
+#include "gatt_db.h"
+/** @brief Macro that stores Value into a buffer in Little Endian Format (2 bytes)*/
+#define HOST_TO_LE_16(buf, val)    ( ((buf)[0] =  (uint8_t) (val)    ) , \
+                                   ((buf)[1] =  (uint8_t) (val>>8) ) )
+
+/** @brief Macro that stores Value into a buffer in Little Endian Format (4 bytes) */
+#define HOST_TO_LE_32(buf, val)    ( ((buf)[0] =  (uint8_t) (val)     ) , \
+                                   ((buf)[1] =  (uint8_t) (val>>8)  ) , \
+                                   ((buf)[2] =  (uint8_t) (val>>16) ) , \
+                                   ((buf)[3] =  (uint8_t) (val>>24) ) )
+#include "bluenrg_gatt_aci.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
+typedef StaticTask_t osStaticThreadDef_t;
 /* USER CODE BEGIN PTD */
 
 /* USER CODE END PTD */
@@ -54,16 +66,26 @@ PCD_HandleTypeDef hpcd_USB_OTG_FS;
 
 /* Definitions for TASK_BLE */
 osThreadId_t TASK_BLEHandle;
+uint32_t TASK_BLEBuffer[ 128 ];
+osStaticThreadDef_t TASK_BLEControlBlock;
 const osThreadAttr_t TASK_BLE_attributes = {
   .name = "TASK_BLE",
-  .stack_size = 128 * 4,
+  .cb_mem = &TASK_BLEControlBlock,
+  .cb_size = sizeof(TASK_BLEControlBlock),
+  .stack_mem = &TASK_BLEBuffer[0],
+  .stack_size = sizeof(TASK_BLEBuffer),
   .priority = (osPriority_t) osPriorityHigh7,
 };
 /* Definitions for TASK_ACC */
 osThreadId_t TASK_ACCHandle;
+uint32_t TASK_ACCBuffer[ 128 ];
+osStaticThreadDef_t TASK_ACCControlBlock;
 const osThreadAttr_t TASK_ACC_attributes = {
   .name = "TASK_ACC",
-  .stack_size = 128 * 4,
+  .cb_mem = &TASK_ACCControlBlock,
+  .cb_size = sizeof(TASK_ACCControlBlock),
+  .stack_mem = &TASK_ACCBuffer[0],
+  .stack_size = sizeof(TASK_ACCBuffer),
   .priority = (osPriority_t) osPriorityHigh7,
 };
 /* Definitions for myMutex01 */
@@ -74,8 +96,15 @@ const osMutexAttr_t myMutex01_attributes = {
 /* USER CODE BEGIN PV */
 LSM6DSL_Object_t MotionSensor;
 volatile uint32_t dataRdyIntReceived;
-uint32_t sf = 1000;
+uint8_t want_update = 0;
+uint32_t sf = 10;
 LSM6DSL_Axes_t acc_axes;
+extern AxesRaw_t x_axes;
+extern AxesRaw_t g_axes;
+extern AxesRaw_t m_axes;
+extern uint16_t HWServW2STHandle;
+extern uint16_t AccGyroMagCharHandle;
+extern volatile int     connected;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -160,7 +189,7 @@ int main(void)
 
   /* Create the thread(s) */
   /* creation of TASK_BLE */
-//  TASK_BLEHandle = osThreadNew(StartTASK_BLE, NULL, &TASK_BLE_attributes);
+  TASK_BLEHandle = osThreadNew(StartTASK_BLE, NULL, &TASK_BLE_attributes);
 
   /* creation of TASK_ACC */
   TASK_ACCHandle = osThreadNew(StartTASK_ACC, NULL, &TASK_ACC_attributes);
@@ -672,7 +701,7 @@ void StartTASK_BLE(void *argument)
 	  MX_BlueNRG_MS_Process();
 
 	  // Print a message indicating BLE task activity (with mutex protection)
-	  PRINTF("BLE Task: Processed BLE data\r\n");
+//	  PRINTF("BLE Task: Processed BLE data\r\n");
 
 	  // Release the mutex to allow other tasks to print
 //	  osMutexRelease(myMutex01Handle);
@@ -698,7 +727,7 @@ void StartTASK_ACC(void *argument)
   {
 	  // Acquire the mutex before accessing shared resources or printing
 //	  osMutexAcquire(myMutex01Handle, osWaitForever);
-	  MX_BlueNRG_MS_Process();
+//	  MX_BlueNRG_MS_Process();
 	  // Check if data is ready to be processed
 	  if (dataRdyIntReceived != 0) {
 		dataRdyIntReceived = 0;
@@ -710,6 +739,28 @@ void StartTASK_ACC(void *argument)
 		// Print accelerometer data (with mutex protection)
 //		PRINTF("ACC Data: % 5d, % 5d, % 5d\r\n", (int) acc_axes.x, (int) acc_axes.y, (int) acc_axes.z);
 	  }
+
+//	  uint8_t buff[2+2*3*3];
+//	  tBleStatus ret;
+//
+//	HOST_TO_LE_16(buff,(HAL_GetTick()>>3));
+//
+//	HOST_TO_LE_16(buff+2,-acc_axes.y);
+//	HOST_TO_LE_16(buff+4, acc_axes.x);
+//	HOST_TO_LE_16(buff+6,-acc_axes.z);
+//
+//	HOST_TO_LE_16(buff+8,acc_axes.y);
+//	HOST_TO_LE_16(buff+10,acc_axes.y);
+//	HOST_TO_LE_16(buff+12,acc_axes.y);
+//
+//	HOST_TO_LE_16(buff+14,acc_axes.y);
+//	HOST_TO_LE_16(buff+16,acc_axes.y);
+//	HOST_TO_LE_16(buff+18,acc_axes.y);
+//	if(connected)
+//	    ret = aci_gatt_update_char_value(HWServW2STHandle, AccGyroMagCharHandle, 0, 2+2*3*3, buff);
+//	  UPP();
+	  want_update = sf;
+	  osDelay(sf*100 +1);
 
 	  // Release the mutex to allow other tasks to access shared resources
 //	  osMutexRelease(myMutex01Handle);
