@@ -98,6 +98,8 @@ LSM6DSL_Object_t MotionSensor;
 volatile uint32_t dataRdyIntReceived;
 uint8_t want_update = 0;
 uint32_t sf = 10;
+uint32_t pre_sf = 10;
+uint32_t remains = 1000;
 LSM6DSL_Axes_t acc_axes;
 extern AxesRaw_t x_axes;
 extern AxesRaw_t g_axes;
@@ -732,7 +734,6 @@ void StartTASK_ACC(void *argument)
 	  if (dataRdyIntReceived != 0) {
 		dataRdyIntReceived = 0;
 
-
 		// Get accelerometer data
 		LSM6DSL_ACC_GetAxes(&MotionSensor, &acc_axes);
 
@@ -759,8 +760,15 @@ void StartTASK_ACC(void *argument)
 //	if(connected)
 //	    ret = aci_gatt_update_char_value(HWServW2STHandle, AccGyroMagCharHandle, 0, 2+2*3*3, buff);
 //	  UPP();
-	  want_update = sf;
-	  osDelay(sf*100 +1);
+	  if((remains == 0) || pre_sf != sf)
+		  want_update = sf;
+	  if(want_update){
+		  remains = sf*100+1;
+		  pre_sf = sf;
+	  }
+	  osDelay(1);
+	  if(sf != 0)
+		  --remains;
 
 	  // Release the mutex to allow other tasks to access shared resources
 //	  osMutexRelease(myMutex01Handle);
